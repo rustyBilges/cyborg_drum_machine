@@ -14,6 +14,9 @@ class _IAudio_stream():
 	
 	@abstractmethod
 	def plot_stream(self): pass
+	
+	@abstractmethod
+	def return_mono_amplitude_array(self): pass
 
 class Audio_stream_const(_IAudio_stream):
 	"""A class to represent a fixed stream of audio data.
@@ -28,6 +31,9 @@ class Audio_stream_const(_IAudio_stream):
 	def plot_stream(self):
 		plt.plot(range(self.length), self.data, 'b')
 		plt.show()
+	
+	def return_mono_amplitude_array(self): 
+		return self.data
 
 class Audio_stream_csv_reader_mono():
 	"""A class to read vocab from a saved numpy array (csv) representing an audio stream
