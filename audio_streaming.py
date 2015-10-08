@@ -18,6 +18,9 @@ class _IAudio_stream():
 	@abstractmethod
 	def return_mono_amplitude_array(self): pass
 
+	@abstractmethod
+	def sub_stream(self): pass
+
 class Audio_stream_const(_IAudio_stream):
 	"""A class to represent a fixed stream of audio data.
 		ToDo: have this class implement a stream interface. Later to write e.g. Audio_stream_dynamic
@@ -34,6 +37,10 @@ class Audio_stream_const(_IAudio_stream):
 	
 	def return_mono_amplitude_array(self): 
 		return self.data
+
+	def sub_stream(self, start, finish):
+		data = self.data[int(start):int(finish)]
+		return Audio_stream_const(data, self.frequency) 
 
 class Audio_stream_csv_reader_mono():
 	"""A class to read vocab from a saved numpy array (csv) representing an audio stream
