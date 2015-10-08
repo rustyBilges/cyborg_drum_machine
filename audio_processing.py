@@ -34,7 +34,15 @@ class Audio_envelope():
 
 
 	def plot(self, color = 'r'):
-		plt.plot(self.data.keys(), self.data.values(), color)
+		prev_v = self.data.values()[0]
+		new = []
+		for v in self.data.values():
+			new.append(v/prev_v)
+			prev_v = v
+		plt.plot(new, color)
+		#plt.plot(self.data.keys(), self.data.values(), color)
+		#plt.plot(self.original_stream.data[::10], 'k')
+		#plt.plot(np.diff(self.data.values()), color)
 		#plt.show()	
 
 
@@ -96,21 +104,24 @@ class _IHit_detector():
 	@abstractmethod
 	def second_front_edge_detector(self): pass
 
+	@abstractmethod
+	def detect(self): pass
+
 class Hit_detector_naive(_IHit_detector):
 	"""Implement hit detector interface.
 
 	   Naive hit detection based on thresholding audio envelope.
 	   ToDO:  calculate audio metrics (e.g. velocity) for the hits (add to interfacemethods or another class?)		
 	"""
-	def __init__(self, envelope, hit_count=None, threshold_on=10):
+	def __init__(self, envelope, hit_count=None, threshold_on=1.5, threshold_off=0.25):
 
 		self.envelope = envelope
 		self.envelope_dict = envelope.return_envelope_dict()
 		self.hit_count = hit_count
 
-		self.state = 'off'  ## 'not hit'
-		self.threshold_on = threshold_on
-		self.threshold_off = threshold_on
+		self.state = 'off'                      ## 'not hit'
+		self.threshold_on = threshold_on        ## multiplier of previous value to indicate switching on
+		self.threshold_off = threshold_off      ## multiplier of max hit value to indicate switching off (decay)
 
 		self.hits  = []
 
@@ -118,23 +129,42 @@ class Hit_detector_naive(_IHit_detector):
 
 		hit_start = None
 		hit_end   = None
+		hit_max   = None
+
+		prev_value = self.envelope_dict.values()[0]
+
 		for t in self.envelope_dict.keys():
 	
-			if self.state=='off' and self.front_edge_detector(t):
-				self.state = 'on'
-				hit_start = t
-			if self.state=='on':
-				hit_end = t
-				self.hits.append(Drum_hit(self.envelope, hit_start, hit_end))
-				self.state = 'off'
-				
-	def front_edge_detector(self, t): 
-		if self.envelope_dict[t] > self.threshold_on:
-			return True	
-	
+			if self.state=='off': 
+				if self.front_edge_detector(t, prev_value):
+					print('on at %f' %t)
+					self.state = 'on'
+					hit_start = t
+					hit_max = self.envelope_dict[t]
+				else:
+					prev_value = self.envelope_dict[t]
 
-	def back_edge_detector(self): pass
-	
+			if self.state=='on':
+				hit_max = max(hit_max, self.envelope_dict[t])
+				if self.back_edge_detector(t, hit_max):
+
+					print('off at %f' %t)
+					hit_end = t
+					self.hits.append(Drum_hit(self.envelope, hit_start, hit_end))
+					self.state = 'off'
+					prev_value = self.envelope_dict[t]
+
+		return self.hits
+				
+	def front_edge_detector(self, t, value):
+		if self.envelope_dict[t] > self.threshold_on * value:
+			return True
+		return False
+			
+	def back_edge_detector(self, t, value): 
+		if self.envelope_dict[t] < self.threshold_off * value:
+			return True
+		return False
 
 	def second_front_edge_detector(self): pass
 
@@ -178,7 +208,7 @@ class Test_hit_detector_naive(unittest.TestCase):
 		asc = ast.Audio_stream_const(data)
 		ee = Envelope_extractor(asc, 100) 			
 		envelope = ee.extract()
-		hd = Hit_detector_naive(envelope, hit_count=2)
+		hd = Hit_detector_naive(envelope, hit_count=2, threshold_on=1.10)
 		hits = hd.detect()
 
 		self.assertEqual(len(hits), 2)
@@ -188,18 +218,21 @@ class Test_hit_detector_naive(unittest.TestCase):
 
 if __name__=='__main__':
 
-        unittest.main()
-
-	#data = np.genfromtxt('raw_vocab.data', delimiter=',')
-	#asc = ast.Audio_stream_const(data)
+	ftest = True
+	#ftest = False
+	if ftest:
+		unittest.main()
+	else:
+		data = np.genfromtxt('raw_vocab.data', delimiter=',')
+		asc = ast.Audio_stream_const(data)
 	
-	#i = 0
-	#cols = ['r','b','g']
-	#for le in [100, 500, 1000]:
-	#	ee = Envelope_extractor(asc, le) 
-#		env = ee.extract()
-#		env.plot(cols[i])
-#		i += 1
+		i = 0
+		cols = ['r','b','g']
+		for le in [100, 500, 1000]:
+			ee = Envelope_extractor(asc, le) 
+			env = ee.extract()
+			env.plot(cols[i])
+			i += 1
 
-#	plt.show()  #edit plot func#  
+		plt.show()  #edit plot func#  
 
